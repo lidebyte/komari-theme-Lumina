@@ -15,7 +15,7 @@ import {
 import {
   cutPeakValues,
   detectTypicalIntervalMs,
-  interpolateMetricGaps,
+  insertMetricGapSentinels,
 } from "./chartData";
 import { latencyHeatColor, lossHeatColor } from "@/utils/metricTone";
 import { usePreferences } from "@/hooks/usePreferences";
@@ -162,10 +162,14 @@ export function PingChart({
     if (cutPeak && taskKeys.length > 0) {
       chartPoints = cutPeakValues(chartPoints, taskKeys);
     }
-    chartPoints = interpolateMetricGaps(chartPoints, taskKeys, {
-      maxGapMultiplier: 6,
-      minCapMs: 120,
-      maxCapMs: 1_800,
+    chartPoints = insertMetricGapSentinels(chartPoints, {
+      intervals: new Map(
+        tasks
+          .filter((task) => typeof task.interval === "number" && task.interval > 0)
+          .map((task) => [String(task.id), task.interval] as const),
+      ),
+      defaultInterval: fallbackInterval,
+      matchToleranceRatio: 0.25,
     });
     const times = chartPoints.map((point) => point.time);
     const perTask = taskKeys.map((taskKey) =>

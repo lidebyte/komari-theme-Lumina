@@ -3,6 +3,26 @@ export type TimedMetricPoint = {
   [key: string]: number | null;
 };
 
+function hasPointNearTime(times: number[], target: number, tolerance: number) {
+  let low = 0;
+  let high = times.length - 1;
+
+  while (low <= high) {
+    const mid = Math.floor((low + high) / 2);
+    const value = times[mid];
+    if (Math.abs(value - target) <= tolerance) {
+      return true;
+    }
+    if (value < target) {
+      low = mid + 1;
+    } else {
+      high = mid - 1;
+    }
+  }
+
+  return false;
+}
+
 function median(values: number[]) {
   if (values.length === 0) return 0;
   const sorted = [...values].sort((a, b) => a - b);
@@ -107,6 +127,62 @@ export function fillMissingMetricPoints(
   }
 
   return filled;
+}
+
+export function insertMetricGapSentinels(
+  points: TimedMetricPoint[],
+  options?: {
+    intervals?: Map<string, number>;
+    defaultInterval?: number;
+    matchToleranceRatio?: number;
+  },
+) {
+  const normalized = normalizePoints(points);
+  if (normalized.points.length < 2 || normalized.keys.length === 0) {
+    return normalized.points;
+  }
+
+  const { points: sortedPoints, keys } = normalized;
+  const existingTimes = sortedPoints.map((point) => point.time);
+  const intervals = options?.intervals ?? new Map<string, number>();
+  const defaultInterval =
+    options?.defaultInterval ?? detectTypicalIntervalMs(existingTimes);
+  const toleranceRatio = options?.matchToleranceRatio ?? 0.25;
+  const sentinels = new Map<number, TimedMetricPoint>();
+
+  for (const key of keys) {
+    const validTimes = sortedPoints
+      .filter((point) => typeof point[key] === "number" && Number.isFinite(point[key]))
+      .map((point) => point.time);
+    if (validTimes.length < 2) continue;
+
+    const configuredInterval = intervals.get(key);
+    const interval =
+      typeof configuredInterval === "number" && configuredInterval > 0
+        ? configuredInterval
+        : detectTypicalIntervalMs(validTimes, defaultInterval);
+    if (!Number.isFinite(interval) || interval <= 0) continue;
+
+    const tolerance = Math.max(1, interval * toleranceRatio);
+    for (let index = 1; index < validTimes.length; index += 1) {
+      const previous = validTimes[index - 1];
+      const current = validTimes[index];
+      if (current - previous <= interval + tolerance) continue;
+
+      for (let expected = previous + interval; expected < current - tolerance; expected += interval) {
+        if (hasPointNearTime(existingTimes, expected, tolerance) || sentinels.has(expected)) {
+          continue;
+        }
+        sentinels.set(expected, { time: expected });
+      }
+    }
+  }
+
+  if (sentinels.size === 0) {
+    return sortedPoints;
+  }
+
+  return normalizePoints([...sortedPoints, ...sentinels.values()]).points;
 }
 
 export function interpolateMetricGaps(

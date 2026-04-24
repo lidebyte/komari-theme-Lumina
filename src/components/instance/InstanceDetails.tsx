@@ -1,9 +1,28 @@
+import { useEffect, useRef } from "react";
 import { useNode } from "@/hooks/useNode";
 import { formatBytes, formatUptimeDays } from "@/utils/format";
 import { InstancePanel } from "./InstancePanel";
 
-export function InstanceDetails({ uuid }: { uuid: string }) {
+export function InstanceDetails({
+  uuid,
+  onNodeReady,
+}: {
+  uuid: string;
+  onNodeReady?: () => (() => void) | void;
+}) {
   const node = useNode(uuid);
+  const hasAlignedOnReadyRef = useRef(false);
+
+  useEffect(() => {
+    hasAlignedOnReadyRef.current = false;
+  }, [uuid]);
+
+  useEffect(() => {
+    if (!node || hasAlignedOnReadyRef.current) return;
+    hasAlignedOnReadyRef.current = true;
+    return onNodeReady?.();
+  }, [node, onNodeReady]);
+
   if (!node) return null;
 
   const isOnline = node.online;

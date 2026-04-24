@@ -7,7 +7,6 @@ export interface TimeRangeOption {
 }
 
 export const LOAD_TIME_RANGE_OPTIONS: TimeRangeOption[] = [
-  { label: "实时", value: 0 },
   { label: "1 小时", value: 1 },
   { label: "4 小时", value: 4 },
   { label: "1 天", value: 24 },

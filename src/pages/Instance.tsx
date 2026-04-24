@@ -1,4 +1,4 @@
-import { startTransition, useEffect, useMemo, useState } from "react";
+import { startTransition, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { ChevronLeft } from "lucide-react";
 import { InstanceDetails } from "@/components/instance/InstanceDetails";
@@ -16,6 +16,7 @@ export function Instance() {
   const { data: config } = usePublicConfig();
   const [chartType, setChartType] = useState<"load" | "ping">("load");
   const [loadHours, setLoadHours] = useState(0);
+  const chartControlsRef = useRef<HTMLDivElement | null>(null);
 
   const loadRanges = useMemo(
     () => buildLoadTimeRangeOptions(config?.record_preserve_time),
@@ -23,8 +24,18 @@ export function Instance() {
   );
   const showPingChart = config?.theme_settings?.showPingChart !== false;
 
+  const alignCharts = () => {
+    const frame = window.requestAnimationFrame(() => {
+      chartControlsRef.current?.scrollIntoView({
+        behavior: "auto",
+        block: "start",
+      });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  };
+
   useEffect(() => {
-    window.scrollTo(0, 0);
+    return alignCharts();
   }, [uuid]);
 
   useEffect(() => {
@@ -50,8 +61,8 @@ export function Instance() {
         <ChevronLeft size={14} />
         返回
       </Link>
-      <InstanceDetails uuid={uuid} />
-      <div className="instance-chart-controls">
+      <InstanceDetails uuid={uuid} onNodeReady={alignCharts} />
+      <div ref={chartControlsRef} className="instance-chart-controls">
         <div className="instance-segmented">
           <button
             type="button"
